@@ -68,6 +68,11 @@ export default function ReceptionistPage() {
         }
         setPatientName('');
     };
+    const handlePopulateMock = () => {
+        if (socketRef.current) {
+            socketRef.current.emit('POPULATE_MOCK_DATA');
+        }
+    };
 
     const handleCallNext = () => {
         if (socketRef.current) {
@@ -147,6 +152,16 @@ export default function ReceptionistPage() {
                         <button type="submit" className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow">
                             Add to Queue List
                         </button>
+                        {/* NEW: ⚡ WINNER MODE POPULATE BUTTON */}
+                        <div className="border-t border-slate-100 pt-4 mt-2">
+                            <button 
+                                type="button"
+                                onClick={handlePopulateMock}
+                                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg shadow-sm tracking-wide transition-all active:scale-95 text-sm flex items-center justify-center gap-1"
+                            >
+                                ⚡ Populate Presentation Demo Data
+                            </button>
+                        </div>
                     </form>
                 </section>
 

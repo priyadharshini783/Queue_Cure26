@@ -44,6 +44,21 @@ io.on('connection', (socket) => {
         // Broadcast structural update to everyone instantly
         io.emit('STATE_UPDATE', state);
     });
+    // Action handler: Bulk populate mock patients for lightning-fast presentation demos
+    socket.on('POPULATE_MOCK_DATA', () => {
+        const mockNames = ["Adhithya Kumar", "Priya Sharma", "Rahul Dravid", "Sneha Reddy", "Vikram Seth"];
+        
+        mockNames.forEach(name => {
+            const mockPatient = {
+                id: (Date.now() + Math.random()).toString(), // Unique ID generation
+                name: name,
+                tokenNumber: state.tokenCounter++
+            };
+            state.queue.push(mockPatient);
+        });
+
+        io.emit('STATE_UPDATE', state); // Broadcast the populated queue globally instantly
+    });
 
     // 3. Action: Call Next Patient (Concurrency protected via atomic .shift())
     socket.on('CALL_NEXT', () => {
