@@ -1,4 +1,3 @@
-// backend/server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,10 +16,12 @@ const io = new Server(server, {
 
 // Centralized System State (In-Memory Source of Truth)
 let state = {
-    queue: [],              // Array of patient objects: { id, name, tokenNumber }
+    queue: [],              // Array of patient objects: { id, name, tokenNumber, severity }
     currentToken: null,     // The token currently being treated
     tokenCounter: 1,        // Auto-incrementing token generator
-    avgConsultTime: 15      // Dynamic variable handled by receptionist (in minutes)
+    avgConsultTime: 15,     // Dynamic variable handled by receptionist (in minutes)
+    totalServed: 0,         // Cumulative counter for analytics metric
+    peakVolume: 0           // Tracks peak crowd boundary dynamically
 };
 
 io.on('connection', (socket) => {
@@ -29,33 +30,56 @@ io.on('connection', (socket) => {
     // 1. Send the instant absolute state the moment a client opens the tab
     socket.emit('STATE_UPDATE', state);
 
-    // 2. Action: Add Patient to Queue
+    // 2. Action: Add Patient to Queue with Smart Triage
     socket.on('ADD_PATIENT', (data) => {
         if (!data.name || data.name.trim() === "") return;
+        
+        // Simulating an AI Triage classification engine allocation
+        const severities = ["Critical", "Urgent", "Routine"];
+        const randomSeverity = severities[Math.floor(Math.random() * severities.length)];
         
         const newPatient = {
             id: Date.now().toString(),
             name: data.name.trim(),
-            tokenNumber: state.tokenCounter++
+            tokenNumber: state.tokenCounter++,
+            severity: randomSeverity // Appending triage metadata
         };
         
         state.queue.push(newPatient);
         
+        // Dynamically compute and adjust Peak Crowd Volume metric
+        if (state.queue.length > state.peakVolume) {
+            state.peakVolume = state.queue.length;
+        }
+        
         // Broadcast structural update to everyone instantly
         io.emit('STATE_UPDATE', state);
     });
+
     // Action handler: Bulk populate mock patients for lightning-fast presentation demos
-    socket.on('POPULATE_MOCK_DATA', () => {
-        const mockNames = ["Adhithya Kumar", "Priya Sharma", "Rahul Dravid", "Sneha Reddy", "Vikram Seth"];
+    socket.on('MOCK_DATA', () => {
+        const mockPatients = [
+            { name: "Adhithya Kumar", severity: "Critical" },
+            { name: "Priya Sharma", severity: "Urgent" },
+            { name: "Rahul Dravid", severity: "Routine" },
+            { name: "Sneha Reddy", severity: "Urgent" },
+            { name: "Vikram Seth", severity: "Routine" }
+        ];
         
-        mockNames.forEach(name => {
+        mockPatients.forEach(item => {
             const mockPatient = {
                 id: (Date.now() + Math.random()).toString(), // Unique ID generation
-                name: name,
-                tokenNumber: state.tokenCounter++
+                name: item.name,
+                tokenNumber: state.tokenCounter++,
+                severity: item.severity // Match designated test case severity
             };
             state.queue.push(mockPatient);
         });
+
+        // Recalculate peak metrics boundary following bulk dump
+        if (state.queue.length > state.peakVolume) {
+            state.peakVolume = state.queue.length;
+        }
 
         io.emit('STATE_UPDATE', state); // Broadcast the populated queue globally instantly
     });
@@ -64,6 +88,7 @@ io.on('connection', (socket) => {
     socket.on('CALL_NEXT', () => {
         if (state.queue.length > 0) {
             state.currentToken = state.queue.shift(); // Atomic extraction
+            state.totalServed++; // Safely increment cumulative throughput tally counter
         } else {
             state.currentToken = null; // Queue is empty
         }
