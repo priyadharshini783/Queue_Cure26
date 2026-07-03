@@ -26,9 +26,10 @@ export default function ReceptionistPage() {
             setConnectionStatus('Script Mounted. Opening Loop...');
             
             if (window.io) {
-                socketRef.current = window.io('http://127.0.0.1:5000', {
-                    transports: ['websocket'],
-                    upgrade: false,
+                // Configured with polling fallback to guarantee smooth initial cross-origin handshakes
+                socketRef.current = window.io('http://localhost:5000', {
+                    transports: ['polling', 'websocket'],
+                    withCredentials: true,
                     reconnectionAttempts: 10,
                     reconnectionDelay: 1000
                 });
@@ -39,6 +40,7 @@ export default function ReceptionistPage() {
 
                 socketRef.current.on('connect_error', (err) => {
                     setConnectionStatus('⚡ Connection Retrying...');
+                    console.log("Socket Connection Error Log:", err);
                 });
 
                 socketRef.current.on('STATE_UPDATE', (updatedState) => {
@@ -58,7 +60,9 @@ export default function ReceptionistPage() {
     const handleAddPatient = (e) => {
         e.preventDefault();
         if (!patientName.trim()) return;
-        if (socketRef.current && socketRef.current.connected) {
+        
+        // Switched from brittle explicit network connection state checks to object reference validations
+        if (socketRef.current) {
             socketRef.current.emit('ADD_PATIENT', { name: patientName });
             setPatientName('');
         } else {
@@ -67,7 +71,7 @@ export default function ReceptionistPage() {
     };
 
     const handlePopulateMock = () => {
-        if (socketRef.current && socketRef.current.connected) {
+        if (socketRef.current) {
             socketRef.current.emit('MOCK_DATA');
         } else {
             alert("Engine is offline. Please verify your backend server is running on port 5000!");
@@ -75,7 +79,7 @@ export default function ReceptionistPage() {
     };
 
     const handleCallNext = () => {
-        if (socketRef.current && socketRef.current.connected) {
+        if (socketRef.current) {
             socketRef.current.emit('CALL_NEXT');
         }
     };
@@ -85,7 +89,7 @@ export default function ReceptionistPage() {
         setInputConsultTime(val);
         const parsed = parseInt(val, 10);
         if (!isNaN(parsed) && parsed > 0 && parsed <= 120) {
-            if (socketRef.current && socketRef.current.connected) {
+            if (socketRef.current) {
                 socketRef.current.emit('UPDATE_CONSULT_TIME', parsed);
             }
         }
@@ -204,7 +208,10 @@ export default function ReceptionistPage() {
                         <ul className="divide-y divide-slate-100 max-h-60 overflow-y-auto pr-1">
                             {state.queue.map((p) => (
                                 <li key={p.id} className="py-2 flex justify-between items-center text-sm border-b border-slate-50 last:border-none">
-                                    <span className="font-medium text-slate-700">{p.name}</span>
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-slate-700">{p.name}</span>
+                                        <span className="text-xs text-indigo-500 font-semibold">AI Wait: {p.mlPredictedWait} mins</span>
+                                    </div>
                                     <span className="bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded text-xs">Token #{p.tokenNumber}</span>
                                 </li>
                             ))}
